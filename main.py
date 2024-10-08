@@ -1,11 +1,11 @@
-from flask import Flask, jsonify
+from flask import Flask, jsonify, request, make_response
 import subprocess
 import re
 
 app = Flask(__name__)
 
 def parse_ansi_colors(text):
-    # 将ANSI颜色代码转换为HTML格式
+    # Convert ANSI color codes to HTML format
     ansi_escape = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
     color_map = {
         '30': 'black', '31': 'red', '32': 'green', '33': 'yellow',
@@ -31,13 +31,21 @@ def parse_ansi_colors(text):
     
     return ''.join(result)
 
+@app.after_request
+def after_request(response):
+    # Set CORS headers for all responses
+    response.headers.add('Access-Control-Allow-Origin', '*')
+    response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization')
+    response.headers.add('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,OPTIONS')
+    return response
+
 @app.route('/fastfetch')
 def get_fastfetch():
     try:
-        # 执行fastfetch命令并捕获输出
+        # Execute the fastfetch command and capture the output
         result = subprocess.run(['fastfetch'], capture_output=True, text=True)
         
-        # 解析ANSI颜色代码
+        # Parse ANSI color codes
         colored_output = parse_ansi_colors(result.stdout)
         
         return jsonify({
