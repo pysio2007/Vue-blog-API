@@ -1,3 +1,4 @@
+import os
 from flask import Flask, jsonify, request, make_response
 import subprocess
 import re
@@ -42,8 +43,15 @@ def after_request(response):
 @app.route('/fastfetch')
 def get_fastfetch():
     try:
-        # Execute the fastfetch command and capture the output
-        result = subprocess.run(['fastfetch'], capture_output=True, text=True)
+        # Set TERM environment variable to xterm-256color
+        env = os.environ.copy()
+        env['TERM'] = 'xterm-256color'
+        
+        # Execute the fastfetch command with modified environment and capture the output
+        result = subprocess.run('fastfetch -c all --logo none ', shell=True, capture_output=True, text=True, env=env)
+        
+        # Debug: Print raw output to console
+        print("Raw output:", result.stdout)
         
         # Parse ANSI color codes
         colored_output = parse_ansi_colors(result.stdout)
