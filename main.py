@@ -2,8 +2,14 @@ import os
 from flask import Flask, jsonify, request, make_response
 import subprocess
 import re
+import time
+
 
 app = Flask(__name__)
+
+last_heartbeat = None
+
+TOKEN = "your_token_here"
 
 def parse_ansi_colors(text):
     # Convert ANSI color codes to HTML format
@@ -65,6 +71,25 @@ def get_fastfetch():
             'status': 'error',
             'message': str(e)
         }), 500
+
+@app.route("/heartbeat", methods=["POST"])
+def heartbeat():
+    # Token 鉴权
+    if request.headers.get("Authorization") != f"Bearer {TOKEN}":
+        return jsonify({"error": "Invalid token"}), 401
+
+    # 记录心跳包时间
+    global last_heartbeat
+    last_heartbeat = int(time.time())
+    return jsonify({"message": "Heartbeat received"})
+
+@app.route("/check", methods=["GET"])
+def check():
+    # 检查心跳包时间
+    if last_heartbeat is not None:
+        time_diff = int(time.time()) - last_heartbeat
+        return jsonify({"alive": time_diff <= 600, "last_heartbeat": last_heartbeat})
+    return jsonify({"alive": False, "last_heartbeat": None})
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)
