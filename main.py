@@ -139,12 +139,37 @@ def get_steam_status():
         else:
             price_info = "免费"
         
+        # 获取游玩时间
+        player_games_url = f"http://api.steampowered.com/IPlayerService/GetOwnedGames/v0001/?key={API_KEY}&steamid={STEAM_ID}&format=json"
+        player_games_response = requests.get(player_games_url)
+        player_games_data = player_games_response.json()
+
+        total_playtime = 0
+        for game in player_games_data.get("response", {}).get("games", []):
+            if str(game.get("appid")) == game_id:
+                total_playtime = game.get("playtime_forever", 0)
+                break
+
+        playtime_hours = total_playtime // 60
+        playtime_minutes = total_playtime % 60
+        
+        # 获取成就完成百分比
+        achievements_url = f"http://api.steampowered.com/ISteamUserStats/GetPlayerAchievements/v0001/?appid={game_id}&key={API_KEY}&steamid={STEAM_ID}"
+        achievements_response = requests.get(achievements_url)
+        achievements_data = achievements_response.json()
+        achievements = achievements_data.get("playerstats", {}).get("achievements", [])
+        total_achievements = len(achievements)
+        completed_achievements = sum(1 for achievement in achievements if achievement["achieved"] == 1)
+        achievement_percentage = (completed_achievements / total_achievements * 100) if total_achievements > 0 else 0
+        
         status = {
             "status": "在游戏中",
             "game": game_name,
             "game_id": game_id,
             "description": short_description,
-            "price": price_info
+            "price": price_info,
+            "playtime": f"{playtime_hours}小时{playtime_minutes}分钟",
+            "achievement_percentage": f"{achievement_percentage:.2f}%"
         }
     else:
         status = {
