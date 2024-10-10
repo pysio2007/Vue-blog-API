@@ -16,7 +16,7 @@ last_heartbeat = None
 
 load_dotenv()
 
-TOKEN = "your_token_here"
+TOKEN = os.getenv("TOKEN")
 
 API_KEY = os.getenv("STEAM_API_KEY")
 STEAM_ID = os.getenv("STEAM_ID")
