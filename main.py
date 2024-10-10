@@ -40,6 +40,10 @@ def parse_ansi_colors(text):
     
     return ''.join(result)
 
+@app.route("/", methods=["GET"])
+def hello():
+    return ("你来这里干啥 喵?")
+
 @app.after_request
 def after_request(response):
     # Set CORS headers for all responses
