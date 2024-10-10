@@ -1,3 +1,5 @@
+# 警告！ 大部分代码由AI直接生成 可读性不做保证 （懒了）
+
 import os
 from flask import Flask, jsonify, request, make_response
 import subprocess
