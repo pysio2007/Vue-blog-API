@@ -178,5 +178,17 @@ def get_steam_status():
     
     return jsonify(status)
 
+@app.route('/egg')
+def egg():
+    return('Oops!')
+
+@app.route('/404')
+def not_found():
+    return('404 Not Found')
+
+@app.route('/50x')
+def servercrash():
+    return('Server Down')
+
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)
