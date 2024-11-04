@@ -176,6 +176,25 @@ app.get('/steam_status', async (req: Request, res: Response) => {
     }
 });
 
+app.get('/ipcheck', async (req: Request, res: Response): Promise<void> => {
+    const ip = req.query.ip as string;
+    if (!ip) {
+        res.status(400).json({ status: 'error', message: 'IP 参数是必须的' });
+        return;
+    }
+
+    try {
+        const ipInfoUrl = `https://ipinfo.io/widget/demo/${ip}`;
+        const ipInfoResponse = await axios.get(ipInfoUrl);
+        const ipInfoData = ipInfoResponse.data;
+
+        res.json(ipInfoData);
+    } catch (error) {
+        logger.error(`ipcheck error: ${(error as Error).message}`);
+        res.status(500).json({ status: 'error', message: (error as Error).message });
+    }
+});
+
 app.get('/egg', (req: Request, res: Response) => {
     res.send('Oops!');
 });
