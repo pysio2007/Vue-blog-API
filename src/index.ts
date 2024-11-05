@@ -190,8 +190,22 @@ app.get('/ipcheck', async (req: Request, res: Response): Promise<void> => {
 
         res.json(ipInfoData);
     } catch (error) {
-        logger.error(`ipcheck error: ${(error as Error).message}`);
-        res.status(500).json({ status: 'error', message: (error as Error).message });
+        if (axios.isAxiosError(error) && error.response?.status === 429) {
+            try {
+                const fallbackUrl = `https://ipinfo.io/${ip}?token=8b1cd5f6e7c400`;
+                const fallbackResponse = await axios.get(fallbackUrl);
+                const fallbackData = fallbackResponse.data;
+                fallbackData["429"] = "true";
+
+                res.json(fallbackData);
+            } catch (fallbackError) {
+                logger.error(`ipcheck fallback error: ${(fallbackError as Error).message}`);
+                res.status(500).json({ status: 'error', message: (fallbackError as Error).message });
+            }
+        } else {
+            logger.error(`ipcheck error: ${(error as Error).message}`);
+            res.status(500).json({ status: 'error', message: (error as Error).message });
+        }
     }
 });
 
