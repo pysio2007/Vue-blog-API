@@ -14,6 +14,7 @@ let lastHeartbeat: number | null = null;
 const TOKEN = process.env.TOKEN;
 const API_KEY = process.env.STEAM_API_KEY;
 const STEAM_ID = process.env.STEAM_ID;
+const IPINFO_TOKEN = process.env.IPINFO_TOKEN;
 
 const logger = winston.createLogger({
     level: 'info',
@@ -192,7 +193,7 @@ app.get('/ipcheck', async (req: Request, res: Response): Promise<void> => {
     } catch (error) {
         if (axios.isAxiosError(error) && error.response?.status === 429) {
             try {
-                const fallbackUrl = `https://ipinfo.io/${ip}?token=8b1cd5f6e7c400`;
+                const fallbackUrl = `https://ipinfo.io/${ip}?token=${IPINFO_TOKEN}`;
                 const fallbackResponse = await axios.get(fallbackUrl);
                 const fallbackData = fallbackResponse.data;
                 fallbackData["429"] = "true";
