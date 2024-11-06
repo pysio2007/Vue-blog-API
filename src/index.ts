@@ -210,6 +210,18 @@ app.get('/ipcheck', async (req: Request, res: Response): Promise<void> => {
     }
 });
 
+app.get('/random_image', async (req: Request, res: Response) => {
+    try {
+        const response = await axios.get('https://randomimg.pysio.online/url.csv');
+        const urls = response.data.split('\n').filter((url: string) => url.trim() !== '');
+        const randomUrl = urls[Math.floor(Math.random() * urls.length)];
+        res.send(`<img src="${randomUrl}" alt="Random Image" />`);
+    } catch (error) {
+        logger.error(`random_image error: ${(error as Error).message}`);
+        res.status(500).json({ status: 'error', message: (error as Error).message });
+    }
+});
+
 app.get('/egg', (req: Request, res: Response) => {
     res.send('Oops!');
 });
