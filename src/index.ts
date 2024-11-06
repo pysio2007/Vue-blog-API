@@ -212,7 +212,7 @@ app.get('/ipcheck', async (req: Request, res: Response): Promise<void> => {
 
 app.get('/random_image', async (req: Request, res: Response) => {
     try {
-        const response = await axios.get('https://randomimg.pysio.online/url.srv');
+        const response = await axios.get('https://randomimg.pysio.online/url.csv');
         const urls = response.data.split('\n').filter((url: string) => url.trim() !== '');
         const randomUrl = urls[Math.floor(Math.random() * urls.length)];
         res.redirect(302, randomUrl);
