@@ -162,30 +162,49 @@ app.get('/steam_status', async (req: Request, res: Response) => {
             const playtimeMinutes = totalPlaytime % 60;
 
             const achievementsUrl = `https://api.steampowered.com/ISteamUserStats/GetPlayerAchievements/v0001/?appid=${gameId}&key=${API_KEY}&steamid=${STEAM_ID}`;
-            const achievementsResponse = await axios.get(achievementsUrl);
-            const achievementsData = achievementsResponse.data.playerstats || {};
+            try {
+                const achievementsResponse = await axios.get(achievementsUrl);
+                const achievementsData = achievementsResponse.data.playerstats || {};
 
-            const achievements = achievementsData.achievements || [];
-            const totalAchievements = achievements.length;
-            const completedAchievements = achievements.filter((achievement: any) => achievement.achieved === 1).length;
-            const achievementPercentage = totalAchievements > 0 ? (completedAchievements / totalAchievements * 100).toFixed(2) : '0.00';
+                const achievements = achievementsData.achievements || [];
+                const totalAchievements = achievements.length;
+                const completedAchievements = achievements.filter((achievement: any) => achievement.achieved === 1).length;
+                const achievementPercentage = totalAchievements > 0 ? (completedAchievements / totalAchievements * 100).toFixed(2) : '0.00';
 
-            res.json({
-                status: '在游戏中',
-                game: gameName,
-                game_id: gameId,
-                description: shortDescription,
-                price: priceInfo,
-                playtime: `${playtimeHours}小时${playtimeMinutes}分钟`,
-                achievement_percentage: `${achievementPercentage}%`
-            });
+                res.json({
+                    status: '在游戏中',
+                    game: gameName,
+                    game_id: gameId,
+                    description: shortDescription,
+                    price: priceInfo,
+                    playtime: `${playtimeHours}小时${playtimeMinutes}分钟`,
+                    achievement_percentage: `${achievementPercentage}%`
+                });
+            } catch (achievementError: any) {
+                if (achievementError.response && achievementError.response.data && achievementError.response.data.playerstats && achievementError.response.data.playerstats.error === "Requested app has no stats") {
+                    res.json({
+                        status: '在游戏中',
+                        game: gameName,
+                        game_id: gameId,
+                        description: shortDescription,
+                        price: priceInfo,
+                        playtime: `${playtimeHours}小时${playtimeMinutes}分钟`,
+                        achievement_percentage: '无成就数据'
+                    });
+                } else {
+                    throw achievementError;
+                }
+            }
         } else {
             res.json({
                 status: player.personastate === 1 ? '在线' : '离线'
             });
         }
     } catch (error) {
-        logger.error(`steam_status error: ${(error as Error).message}`);
+        logger.error(`steam_status error: ${(error as Error).message}`, {
+            url: (error as any).config?.url,
+            data: (error as any).response?.data
+        });
         res.status(500).json({ status: 'error', message: (error as Error).message });
     }
 });
