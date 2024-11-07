@@ -2,11 +2,12 @@ import express, { Request, Response, NextFunction } from 'express';
 import dotenv from 'dotenv';
 import { exec } from 'child_process';
 import axios from 'axios';
+import { promisify } from 'util';
+import fs from 'fs/promises';
+import path from 'path';
 // @ts-ignore
 import morgan from 'morgan';
 import winston from 'winston';
-import fs from 'fs';
-import path from 'path';
 
 dotenv.config();
 
@@ -32,17 +33,17 @@ const logger = winston.createLogger({
     ]
 });
 
-function readCountFromFile(): number {
+async function readCountFromFile(): Promise<number> {
     try {
-        const data = fs.readFileSync(countFilePath, 'utf8');
+        const data = await fs.readFile(countFilePath, 'utf8');
         return parseInt(data, 10) || 0;
     } catch (error) {
         return 0;
     }
 }
 
-function writeCountToFile(count: number): void {
-    fs.writeFileSync(countFilePath, count.toString(), 'utf8');
+async function writeCountToFile(count: number): Promise<void> {
+    await fs.writeFile(countFilePath, count.toString(), 'utf8');
 }
 
 app.use(morgan('combined', { stream: { write: (message: string) => logger.info(message.trim()) } }));
@@ -91,17 +92,12 @@ app.get('/', (req: Request, res: Response) => {
 
 app.get('/fastfetch', async (req: Request, res: Response) => {
     try {
-        exec('fastfetch -c all --logo none', { env: { ...process.env, TERM: 'xterm-256color' } }, (error, stdout) => {
-            if (error) {
-                logger.error(`fastfetch error: ${(error as Error).message}`);
-                res.status(500).json({ status: 'error', message: (error as Error).message });
-                return;
-            }
-            const coloredOutput = parseAnsiColors(stdout);
-            res.json({ status: 'success', output: coloredOutput });
-        });
+        const execAsync = promisify(exec);
+        const { stdout } = await execAsync('fastfetch -c all --logo none', { env: { ...process.env, TERM: 'xterm-256color' } });
+        const coloredOutput = parseAnsiColors(stdout);
+        res.json({ status: 'success', output: coloredOutput });
     } catch (error) {
-        logger.error(`fastfetch catch error: ${(error as Error).message}`);
+        logger.error(`fastfetch error: ${(error as Error).message}`);
         res.status(500).json({ status: 'error', message: (error as Error).message });
     }
 });
@@ -230,11 +226,11 @@ app.get('/ipcheck', async (req: Request, res: Response): Promise<void> => {
 app.get('/random_image', async (req: Request, res: Response) => {
     try {
         // 读取当前计数
-        let count = readCountFromFile();
+        let count = await readCountFromFile();
         // 增加计数
         count += 1;
         // 写回新的计数
-        writeCountToFile(count);
+        await writeCountToFile(count);
 
         const response = await axios.get('https://randomimg.pysio.online/url.csv');
         const urls = response.data.split('\n').filter((url: string) => url.trim() !== '');
@@ -246,9 +242,9 @@ app.get('/random_image', async (req: Request, res: Response) => {
     }
 });
 
-app.get('/random_image_count', (req: Request, res: Response) => {
+app.get('/random_image_count', async (req: Request, res: Response) => {
     try {
-        const count = readCountFromFile();
+        const count = await readCountFromFile();
         res.json({ count });
     } catch (error) {
         logger.error(`random_image_count error: ${(error as Error).message}`);
