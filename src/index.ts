@@ -5,11 +5,15 @@ import axios from 'axios';
 // @ts-ignore
 import morgan from 'morgan';
 import winston from 'winston';
+import fs from 'fs';
+import path from 'path';
 
 dotenv.config();
 
 const app = express();
 let lastHeartbeat: number | null = null;
+
+const countFilePath = path.join(__dirname, 'random_image_count.txt');
 
 const TOKEN = process.env.TOKEN;
 const API_KEY = process.env.STEAM_API_KEY;
@@ -27,6 +31,19 @@ const logger = winston.createLogger({
         new winston.transports.File({ filename: 'combined.log' })
     ]
 });
+
+function readCountFromFile(): number {
+    try {
+        const data = fs.readFileSync(countFilePath, 'utf8');
+        return parseInt(data, 10) || 0;
+    } catch (error) {
+        return 0;
+    }
+}
+
+function writeCountToFile(count: number): void {
+    fs.writeFileSync(countFilePath, count.toString(), 'utf8');
+}
 
 app.use(morgan('combined', { stream: { write: (message: string) => logger.info(message.trim()) } }));
 
@@ -212,12 +229,29 @@ app.get('/ipcheck', async (req: Request, res: Response): Promise<void> => {
 
 app.get('/random_image', async (req: Request, res: Response) => {
     try {
+        // 读取当前计数
+        let count = readCountFromFile();
+        // 增加计数
+        count += 1;
+        // 写回新的计数
+        writeCountToFile(count);
+
         const response = await axios.get('https://randomimg.pysio.online/url.csv');
         const urls = response.data.split('\n').filter((url: string) => url.trim() !== '');
         const randomUrl = urls[Math.floor(Math.random() * urls.length)];
         res.redirect(302, randomUrl);
     } catch (error) {
         logger.error(`random_image error: ${(error as Error).message}`);
+        res.status(500).json({ status: 'error', message: (error as Error).message });
+    }
+});
+
+app.get('/random_image_count', (req: Request, res: Response) => {
+    try {
+        const count = readCountFromFile();
+        res.json({ count });
+    } catch (error) {
+        logger.error(`random_image_count error: ${(error as Error).message}`);
         res.status(500).json({ status: 'error', message: (error as Error).message });
     }
 });

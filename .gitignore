@@ -11,3 +11,5 @@ yarn-error.log*
 combined.log
 
 .vscode/*
+
+src/random_image_count.txt
