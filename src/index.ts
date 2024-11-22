@@ -20,6 +20,9 @@ const TOKEN = process.env.TOKEN;
 const API_KEY = process.env.STEAM_API_KEY;
 const STEAM_ID = process.env.STEAM_ID;
 const IPINFO_TOKEN = process.env.IPINFO_TOKEN;
+const GITHUB_CLIENT_ID = process.env.GITHUB_CLIENT_ID;
+const GITHUB_CLIENT_SECRET = process.env.GITHUB_CLIENT_SECRET;
+const ALLOWED_USERS = ['pysio2007']; 
 
 const logger = winston.createLogger({
     level: 'info',
@@ -33,6 +36,11 @@ const logger = winston.createLogger({
     ]
 });
 
+// Express中间件配置
+app.use(express.json());
+app.use(morgan('combined', { stream: { write: (message: string) => logger.info(message.trim()) } }));
+
+// 文件读写函数
 async function readCountFromFile(): Promise<number> {
     try {
         const data = await fs.readFile(countFilePath, 'utf8');
@@ -45,8 +53,6 @@ async function readCountFromFile(): Promise<number> {
 async function writeCountToFile(count: number): Promise<void> {
     await fs.writeFile(countFilePath, count.toString(), 'utf8');
 }
-
-app.use(morgan('combined', { stream: { write: (message: string) => logger.info(message.trim()) } }));
 
 function parseAnsiColors(text: string): string {
     const ansiEscape = /\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])/g;
@@ -79,6 +85,7 @@ function parseAnsiColors(text: string): string {
     return result.join('');
 }
 
+// CORS中间件
 app.use((req: Request, res: Response, next: NextFunction) => {
     res.header('Access-Control-Allow-Origin', '*');
     res.header('Access-Control-Allow-Headers', 'Content-Type,Authorization');
@@ -86,6 +93,7 @@ app.use((req: Request, res: Response, next: NextFunction) => {
     next();
 });
 
+// 原有路由
 app.get('/', (req: Request, res: Response) => {
     res.send('你来这里干啥 喵?');
 });
@@ -99,6 +107,77 @@ app.get('/fastfetch', async (req: Request, res: Response) => {
     } catch (error) {
         logger.error(`fastfetch error: ${(error as Error).message}`);
         res.status(500).json({ status: 'error', message: (error as Error).message });
+    }
+});
+
+// GitHub OAuth相关路由
+app.post('/auth/github', async (req: Request, res: Response): Promise<void> => {
+    const { code } = req.body;
+    
+    try {
+        const tokenRes = await axios.post('https://github.com/login/oauth/access_token', {
+            client_id: GITHUB_CLIENT_ID,
+            client_secret: GITHUB_CLIENT_SECRET,
+            code
+        }, {
+            headers: { Accept: 'application/json' }
+        });
+
+        const { access_token } = tokenRes.data;
+
+        const userRes = await axios.get('https://api.github.com/user', {
+            headers: { Authorization: `token ${access_token}` }
+        });
+
+        const user = userRes.data;
+
+        if (!ALLOWED_USERS.includes(user.login)) {
+            res.status(403).json({ error: 'Unauthorized user' });
+            return;
+        }
+
+        res.json({ access_token });
+    } catch (error) {
+        res.status(500).json({ error: (error as Error).message });
+    }
+});
+
+app.get('/repo/files', async (req: Request, res: Response) => {
+    const token = req.headers.authorization?.split(' ')[1];
+    
+    try {
+        const filesRes = await axios.get(
+            'https://api.github.com/repos/PysioHub/Vue-blog-Dev/contents', {
+            headers: { Authorization: `token ${token}` }
+        });
+
+        res.json(filesRes.data);
+    } catch (error) {
+        res.status(500).json({ error: (error as Error).message });
+    }
+});
+
+app.put('/repo/files/:path', async (req: Request, res: Response) => {
+    const token = req.headers.authorization?.split(' ')[1];
+    const { content, sha, message } = req.body;
+    const filePath = req.params.path;
+
+    try {
+        const updateRes = await axios.put(
+            `https://api.github.com/repos/PysioHub/Vue-blog-Dev/contents/${filePath}`,
+            {
+                message: message || 'Update file',
+                content: Buffer.from(content).toString('base64'),
+                sha
+            },
+            {
+                headers: { Authorization: `token ${token}` }
+            }
+        );
+
+        res.json(updateRes.data);
+    } catch (error) {
+        res.status(500).json({ error: (error as Error).message });
     }
 });
 
