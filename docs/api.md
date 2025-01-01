@@ -1,11 +1,28 @@
-# API 文档
+---
+title: 博客所有的API
+date: 2025-01-01
+icon: fa-solid fa-webhook
+category: develop
+tag:
+  - 服务
+  - API
+---
 
 ## 通用说明
 
+> [!NOTE]
+> 所有API均已部署至生产环境，请使用以下基础URL进行访问。
+
 ### 基础URL
 ```
-http://localhost:5000
+https://blogapi.pysio.online
 ```
+
+> [!IMPORTANT]
+> 在进行API调用时，请注意以下事项：
+> - 所有请求都需要使用HTTPS协议
+> - API可能会有速率限制
+> - 请妥善保管您的认证令牌
 
 ### 通用响应格式
 所有JSON响应都遵循以下格式：
@@ -16,12 +33,25 @@ http://localhost:5000
 }
 ```
 
+> [!TIP]
+> 调试API时，建议使用以下工具：
+> - [Postman](https://www.postman.com/)
+> - [Insomnia](https://insomnia.rest/)
+> - [curl](https://curl.se/)
+
 ### 认证头格式
 ```
 Authorization: Bearer {TOKEN}
 ```
 
+> [!WARNING]
+> 请勿在客户端代码中直接存储管理员令牌。
+> 确保在生产环境中使用安全的令牌存储方式。
+
 ## 系统状态接口
+
+> [!NOTE]
+> 系统状态接口可用于监控服务健康状况。
 
 ### 1. 系统状态检查
 - **请求路径**: `/`
@@ -30,8 +60,11 @@ Authorization: Bearer {TOKEN}
 - **响应示例**: `你来这里干啥 喵?`
 - **调试示例**:
   ```bash
-  curl http://localhost:5000/
+  curl https://blogapi.pysio.online/
   ```
+
+> [!TIP]
+> 建议使用此端点进行基础连通性测试。
 
 ### 2. FastFetch 系统信息
 - **请求路径**: `/fastfetch`
@@ -46,7 +79,7 @@ Authorization: Bearer {TOKEN}
   ```
 - **调试示例**:
   ```bash
-  curl http://localhost:5000/fastfetch
+  curl https://blogapi.pysio.online/fastfetch
   ```
 
 ### 3. 心跳检测
@@ -65,7 +98,7 @@ Authorization: Bearer {TOKEN}
   ```
 - **调试示例**:
   ```bash
-  curl -X POST -H "Authorization: Bearer your_token" http://localhost:5000/heartbeat
+  curl -X POST -H "Authorization: Bearer your_token" https://blogapi.pysio.online/heartbeat
   ```
 
 ### 4. 状态检查
@@ -81,10 +114,14 @@ Authorization: Bearer {TOKEN}
   ```
 - **调试示例**:
   ```bash
-  curl http://localhost:5000/check
+  curl https://blogapi.pysio.online/check
   ```
 
 ## 图片管理接口
+
+> [!CAUTION]
+> 图片上传接口仅供管理员使用。
+> 上传的图片会自动优化为WebP格式。
 
 ### 1. 获取随机图片
 - **请求路径**: `/random_image`
@@ -104,7 +141,7 @@ Authorization: Bearer {TOKEN}
   ```
 - **调试示例**:
   ```bash
-  curl http://localhost:5000/random_image -o random.webp
+  curl https://blogapi.pysio.online/random_image -o random.webp
   ```
 
 ### 2. 获取特定图片
@@ -126,7 +163,7 @@ Authorization: Bearer {TOKEN}
   ```
 - **调试示例**:
   ```bash
-  curl http://localhost:5000/images/your_image_hash -o image.webp
+  curl https://blogapi.pysio.online/images/your_image_hash -o image.webp
   ```
 
 ### 3. 获取图片（优化版）
@@ -152,7 +189,7 @@ Authorization: Bearer {TOKEN}
   ```
 - **调试示例**:
   ```bash
-  curl -H "If-None-Match: \"your_image_hash\"" http://localhost:5000/i/your_image_hash -o image.webp
+  curl -H "If-None-Match: \"your_image_hash\"" https://blogapi.pysio.online/i/your_image_hash -o image.webp
   ```
 
 ### 4. 上传图片
@@ -192,7 +229,7 @@ Authorization: Bearer {TOKEN}
   curl -X POST \
     -H "Authorization: Bearer your_admin_token" \
     -F "image=@/path/to/your/image.jpg" \
-    http://localhost:5000/images/add
+    https://blogapi.pysio.online/images/add
   ```
 
 ### 5. 获取图片列表
@@ -221,7 +258,7 @@ Authorization: Bearer {TOKEN}
   ```
 - **调试示例**:
   ```bash
-  curl "http://localhost:5000/images/list?page=1&limit=10"
+  curl "https://blogapi.pysio.online/images/list?page=1&limit=10"
   ```
 
 ### 6. 获取图片总数
@@ -236,7 +273,7 @@ Authorization: Bearer {TOKEN}
   ```
 - **调试示例**:
   ```bash
-  curl http://localhost:5000/images/count
+  curl https://blogapi.pysio.online/images/count
   ```
 
 ### 7. 删除图片
@@ -266,7 +303,7 @@ Authorization: Bearer {TOKEN}
   ```bash
   curl -X DELETE \
     -H "Authorization: Bearer your_admin_token" \
-    http://localhost:5000/images/your_image_hash
+    https://blogapi.pysio.online/images/your_image_hash
   ```
 
 ## Steam 状态接口
@@ -295,7 +332,7 @@ Authorization: Bearer {TOKEN}
   ```
 - **调试示例**:
   ```bash
-  curl http://localhost:5000/steam_status
+  curl https://blogapi.pysio.online/steam_status
   ```
 
 ## IP 查询接口
@@ -322,7 +359,7 @@ Authorization: Bearer {TOKEN}
   ```
 - **调试示例**:
   ```bash
-  curl "http://localhost:5000/ipcheck?ip=8.8.8.8"
+  curl "https://blogapi.pysio.online/ipcheck?ip=8.8.8.8"
   ```
 
 ## API 统计接口
@@ -343,7 +380,7 @@ Authorization: Bearer {TOKEN}
   ```
 - **调试示例**:
   ```bash
-  curl http://localhost:5000/api_stats
+  curl https://blogapi.pysio.online/api_stats
   ```
 
 ### 2. 获取特定API调用统计
@@ -370,10 +407,22 @@ Authorization: Bearer {TOKEN}
   ```
 - **调试示例**:
   ```bash
-  curl http://localhost:5000/api_stats/random_image
+  curl https://blogapi.pysio.online/api_stats/random_image
   ```
 
-## 错误响应示例
+## 错误处理
+
+> [!WARNING]
+> 请确保您的应用程序正确处理以下错误响应：
+
+### 常见错误码
+| 错误码 | 说明 | 处理建议 |
+|--------|------|----------|
+| 401 | 未授权 | 检查认证令牌 |
+| 403 | 禁止访问 | 确认权限级别 |
+| 404 | 资源未找到 | 验证请求路径 |
+| 429 | 请求过多 | 实现速率限制处理 |
+| 500 | 服务器错误 | 联系管理员 |
 
 ### 401 未授权
 ```json
@@ -396,13 +445,27 @@ Authorization: Bearer {TOKEN}
 }
 ```
 
-## 注意事项
+## 最佳实践
 
-1. 所有图片自动转换为WebP格式存储和返回
-2. 图片上传时进行重复检测
-3. `/i/:hash` 接口支持浏览器缓存
-4. 所有API调用自动记录到统计系统
-5. 管理员操作需要ADMIN_TOKEN
-6. 错误记录到日志系统
-7. 建议使用工具如Postman进行API调试
-8. 所有时间戳使用UTC时间
+> [!TIP]
+> 1. 实现请求重试机制
+> 2. 使用适当的缓存策略
+> 3. 监控API调用频率
+> 4. 实现错误处理
+> 5. 定期检查API更新
+
+## 性能优化
+
+> [!NOTE]
+> - 图片接口支持HTTP缓存
+> - 使用CDN加速静态资源
+> - 支持图片压缩和格式转换
+> - 批量请求时注意并发限制
+
+## 问题反馈
+
+> [!TIP]
+> 如遇到API相关问题，请通过以下方式反馈：
+> 1. 提交GitHub Issue
+> 2. 发送邮件至管理员
+> 3. 在博客评论区留言
