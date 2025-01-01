@@ -93,10 +93,19 @@ function parseAnsiColors(text: string): string {
     return result.join('');
 }
 
-app.use((req: Request, res: Response, next: NextFunction) => {
+// 替换现有的 CORS 中间件
+app.use(function corsMiddleware(req: Request, res: Response, next: NextFunction) {
     res.header('Access-Control-Allow-Origin', '*');
-    res.header('Access-Control-Allow-Headers', 'Content-Type,Authorization');
-    res.header('Access-Control-Allow-Methods', 'GET,PUT,POST');
+    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+    res.header('Access-Control-Max-Age', '86400'); // 24小时缓存预检请求结果
+
+    // 处理 OPTIONS 预检请求
+    if (req.method === 'OPTIONS') {
+        res.status(200).end();
+        return;
+    }
+
     next();
 });
 
