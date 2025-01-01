@@ -492,7 +492,7 @@ app.get('/images/:hash', async (req: Request, res: Response): Promise<void> => {
   }
 });
 
-// 添加通过hash直接展示图片的接口
+// 修改通过hash直接展示图片的接口
 app.get('/i/:hash', async (req: Request, res: Response): Promise<void> => {
   try {
     const { hash } = req.params;
@@ -503,17 +503,22 @@ app.get('/i/:hash', async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
+    // 设置强缓存和CDN相关的响应头
     res.set({
       'Content-Type': 'image/webp',
       'Content-Disposition': `inline; filename="${hash}.webp"`,
-      'Cache-Control': 'public, max-age=31536000', // 缓存一年
-      'ETag': `"${hash}"` // 添加ETag支持
+      'Cache-Control': 'public, max-age=31536000, immutable', // 一年缓存，添加immutable
+      'ETag': `"${hash}"`,
+      'CDN-Cache-Control': 'max-age=31536000', // 专门针对CDN的缓存控制
+      'Surrogate-Control': 'max-age=31536000', // 用于CDN缓存控制
+      'Access-Control-Allow-Origin': '*', // 允许跨域访问
+      'Vary': 'Accept' // 基于Accept头的内容协商
     });
     
     // 检查浏览器缓存
     const ifNoneMatch = req.header('If-None-Match');
     if (ifNoneMatch === `"${hash}"`) {
-      res.status(304).send(); // Not Modified
+      res.status(304).send();
       return;
     }
 
