@@ -8,18 +8,45 @@ import path from 'path';
 // @ts-ignore
 import morgan from 'morgan';
 import winston from 'winston';
+import mongoose from 'mongoose';
+import multer from 'multer';
+import crypto from 'crypto';
+import sharp from 'sharp';
 
 dotenv.config();
 
+// MongoDB 连接
+mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/image-store')
+  .then(() => console.log('MongoDB connected'))
+  .catch(err => console.error('MongoDB connection error:', err));
+
+// 图片 Schema
+const imageSchema = new mongoose.Schema({
+  hash: { type: String, required: true, unique: true },
+  data: { type: Buffer, required: true },
+  contentType: { type: String, required: true },
+  createdAt: { type: Date, default: Date.now }
+});
+
+const Image = mongoose.model('Image', imageSchema);
+
+// 添加计数 Schema（在现有的 Image Schema 后面）
+const countSchema = new mongoose.Schema({
+  key: { type: String, required: true, unique: true },
+  count: { type: Number, default: 0 },
+  lastUpdated: { type: Date, default: Date.now }
+});
+
+const Count = mongoose.model('Count', countSchema);
+
 const app = express();
 let lastHeartbeat: number | null = null;
-
-const countFilePath = path.join(__dirname, 'random_image_count.txt');
 
 const TOKEN = process.env.TOKEN;
 const API_KEY = process.env.STEAM_API_KEY;
 const STEAM_ID = process.env.STEAM_ID;
 const IPINFO_TOKEN = process.env.IPINFO_TOKEN;
+const ADMIN_TOKEN = process.env.ADMIN_TOKEN;
 
 const logger = winston.createLogger({
     level: 'info',
@@ -32,19 +59,6 @@ const logger = winston.createLogger({
         new winston.transports.File({ filename: 'combined.log' })
     ]
 });
-
-async function readCountFromFile(): Promise<number> {
-    try {
-        const data = await fs.readFile(countFilePath, 'utf8');
-        return parseInt(data, 10) || 0;
-    } catch (error) {
-        return 0;
-    }
-}
-
-async function writeCountToFile(count: number): Promise<void> {
-    await fs.writeFile(countFilePath, count.toString(), 'utf8');
-}
 
 app.use(morgan('combined', { stream: { write: (message: string) => logger.info(message.trim()) } }));
 
@@ -242,33 +256,272 @@ app.get('/ipcheck', async (req: Request, res: Response): Promise<void> => {
     }
 });
 
-app.get('/random_image', async (req: Request, res: Response) => {
-    try {
-        // 读取当前计数
-        let count = await readCountFromFile();
-        // 增加计数
-        count += 1;
-        // 写回新的计数
-        await writeCountToFile(count);
+// 验证管理员token的中间件
+const verifyAdminToken = (req: Request, res: Response, next: NextFunction): void => {
+  const authHeader = req.headers.authorization;
+  if (!authHeader || authHeader !== `Bearer ${ADMIN_TOKEN}`) {
+    res.status(401).json({ error: 'Unauthorized' });
+    return;
+  }
+  next();
+};
 
-        const response = await axios.get('https://randomimg.pysio.online/url.csv');
-        const urls = response.data.split('\n').filter((url: string) => url.trim() !== '');
-        const randomUrl = urls[Math.floor(Math.random() * urls.length)];
-        res.redirect(302, randomUrl);
-    } catch (error) {
-        logger.error(`random_image error: ${(error as Error).message}`);
-        res.status(500).json({ status: 'error', message: (error as Error).message });
+// 配置文件上传
+const storage = multer.memoryStorage();
+const upload = multer({ storage: storage });
+
+// 更新调用次数的辅助函数（在其他函数定义处添加）
+async function incrementCount(key: string): Promise<number> {
+  const result = await Count.findOneAndUpdate(
+    { key },
+    { $inc: { count: 1 }, lastUpdated: new Date() },
+    { upsert: true, new: true }
+  );
+  return result.count;
+}
+
+// 图片转换为webp的辅助函数
+async function convertToWebp(buffer: Buffer): Promise<Buffer> {
+  return await sharp(buffer)
+    .webp({ quality: 80 })
+    .toBuffer();
+}
+
+// 添加API请求计数中间件
+const countApiCalls = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  const path = req.path.replace(/\/+$/, '');  // 移除尾部斜杠
+  try {
+    await incrementCount(path);
+  } catch (error) {
+    logger.error(`API count error for ${path}: ${(error as Error).message}`);
+  }
+  next();
+};
+
+// 应用计数中间件到所有路由
+app.use(countApiCalls);
+
+// 修改随机图片接口
+app.get('/random_image', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const count = await Image.countDocuments();
+    if (count === 0) {
+      res.status(404).json({ error: 'No images available' });
+      return;
     }
+
+    const random = Math.floor(Math.random() * count);
+    const image = await Image.findOne().skip(random);
+    
+    if (!image) {
+      res.status(404).json({ error: 'Image not found' });
+      return;
+    }
+
+    // 增加调用次数
+    await incrementCount('random_image');
+
+    // 返回文件名为hash的webp图片
+    res.set({
+      'Content-Type': 'image/webp',
+      'Content-Disposition': `inline; filename="${image.hash}.webp"`
+    });
+    res.send(image.data);
+  } catch (error) {
+    logger.error(`random_image error: ${(error as Error).message}`);
+    res.status(500).json({ status: 'error', message: (error as Error).message });
+  }
 });
 
-app.get('/random_image_count', async (req: Request, res: Response) => {
-    try {
-        const count = await readCountFromFile();
-        res.json({ count });
-    } catch (error) {
-        logger.error(`random_image_count error: ${(error as Error).message}`);
-        res.status(500).json({ status: 'error', message: (error as Error).message });
+// 添加获取调用次数的接口
+app.get('/api_stats', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const stats = await Count.find().select('-_id key count lastUpdated');
+    res.json(stats);
+  } catch (error) {
+    logger.error(`api_stats error: ${(error as Error).message}`);
+    res.status(500).json({ status: 'error', message: (error as Error).message });
+  }
+});
+
+// 获取特定接口的调用次数
+app.get('/api_stats/:key', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { key } = req.params;
+    const stat = await Count.findOne({ key }).select('-_id key count lastUpdated');
+    
+    if (!stat) {
+      res.json({ key, count: 0, lastUpdated: null });
+      return;
     }
+
+    res.json(stat);
+  } catch (error) {
+    logger.error(`api_stats key error: ${(error as Error).message}`);
+    res.status(500).json({ status: 'error', message: (error as Error).message });
+  }
+});
+
+// 获取图片总数
+app.get('/images/count', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const count = await Image.countDocuments();
+    res.json({ count });
+  } catch (error) {
+    logger.error(`image count error: ${(error as Error).message}`);
+    res.status(500).json({ status: 'error', message: (error as Error).message });
+  }
+});
+
+// 获取图片列表
+app.get('/images/list', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = parseInt(req.query.limit as string) || 10;
+    const skip = (page - 1) * limit;
+
+    const images = await Image.find()
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit)
+      .select('hash contentType createdAt');
+
+    const total = await Image.countDocuments();
+
+    res.json({
+      images,
+      pagination: {
+        current: page,
+        size: limit,
+        total
+      }
+    });
+  } catch (error) {
+    logger.error(`image list error: ${(error as Error).message}`);
+    res.status(500).json({ status: 'error', message: (error as Error).message });
+  }
+});
+
+// 添加新图片
+app.post('/images/add', verifyAdminToken, upload.single('image'), async (req: Request, res: Response): Promise<void> => {
+  try {
+    if (!req.file) {
+      res.status(400).json({ error: 'Image file is required' });
+      return;
+    }
+
+    const fileBuffer = req.file.buffer;
+    const originalHash = crypto.createHash('md5').update(fileBuffer).digest('hex');
+
+    // 转换为webp
+    const webpBuffer = await convertToWebp(fileBuffer);
+    const webpHash = crypto.createHash('md5').update(webpBuffer).digest('hex');
+
+    // 检查是否已存在（基于原始文件和webp都检查）
+    const exists = await Image.findOne({
+      $or: [
+        { hash: originalHash },
+        { hash: webpHash }
+      ]
+    });
+
+    if (exists) {
+      res.status(409).json({ 
+        error: 'Image already exists',
+        existingHash: exists.hash 
+      });
+      return;
+    }
+
+    const image = new Image({
+      hash: webpHash,
+      data: webpBuffer,
+      contentType: 'image/webp'
+    });
+
+    await image.save();
+    
+    res.status(201).json({ 
+      hash: webpHash,
+      contentType: 'image/webp',
+      size: webpBuffer.length
+    });
+  } catch (error) {
+    logger.error(`image add error: ${(error as Error).message}`);
+    res.status(500).json({ status: 'error', message: (error as Error).message });
+  }
+});
+
+// 删除图片
+app.delete('/images/:hash', verifyAdminToken, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { hash } = req.params;
+    const result = await Image.findOneAndDelete({ hash });
+
+    if (!result) {
+      res.status(404).json({ error: 'Image not found' });
+      return;
+    }
+
+    res.json({ message: 'Image deleted successfully', hash });
+  } catch (error) {
+    logger.error(`image delete error: ${(error as Error).message}`);
+    res.status(500).json({ status: 'error', message: (error as Error).message });
+  }
+});
+
+// 修改特定图片获取接口
+app.get('/images/:hash', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { hash } = req.params;
+    const image = await Image.findOne({ hash });
+
+    if (!image) {
+      res.status(404).json({ error: 'Image not found' });
+      return;
+    }
+
+    res.set({
+      'Content-Type': 'image/webp',
+      'Content-Disposition': `inline; filename="${hash}.webp"`
+    });
+    res.send(image.data);
+  } catch (error) {
+    logger.error(`get image error: ${(error as Error).message}`);
+    res.status(500).json({ status: 'error', message: (error as Error).message });
+  }
+});
+
+// 添加通过hash直接展示图片的接口
+app.get('/i/:hash', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { hash } = req.params;
+    const image = await Image.findOne({ hash });
+
+    if (!image) {
+      res.status(404).json({ error: 'Image not found' });
+      return;
+    }
+
+    res.set({
+      'Content-Type': 'image/webp',
+      'Content-Disposition': `inline; filename="${hash}.webp"`,
+      'Cache-Control': 'public, max-age=31536000', // 缓存一年
+      'ETag': `"${hash}"` // 添加ETag支持
+    });
+    
+    // 检查浏览器缓存
+    const ifNoneMatch = req.header('If-None-Match');
+    if (ifNoneMatch === `"${hash}"`) {
+      res.status(304).send(); // Not Modified
+      return;
+    }
+
+    res.send(image.data);
+  } catch (error) {
+    logger.error(`get image by hash error: ${(error as Error).message}`);
+    res.status(500).json({ status: 'error', message: (error as Error).message });
+  }
 });
 
 app.get('/egg', (req: Request, res: Response) => {
