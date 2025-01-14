@@ -202,6 +202,37 @@ func SteamStatus(c *gin.Context) {
 			return
 		}
 
+		// 获取成就完成度
+		achievementUrl := fmt.Sprintf("https://api.steampowered.com/ISteamUserStats/GetPlayerAchievements/v1/?appid=%s&key=%s&steamid=%s",
+			player.GameID, steamAPIKey, steamID)
+		achieveResp, err := http.Get(achievementUrl)
+
+		var achievementPercent float64
+		if err == nil && achieveResp.StatusCode == http.StatusOK {
+			defer achieveResp.Body.Close()
+
+			var achieveResult struct {
+				PlayerStats struct {
+					Achievements []struct {
+						Achieved int `json:"achieved"`
+					} `json:"achievements"`
+				} `json:"playerstats"`
+			}
+
+			if err := json.NewDecoder(achieveResp.Body).Decode(&achieveResult); err == nil {
+				total := len(achieveResult.PlayerStats.Achievements)
+				completed := 0
+				for _, ach := range achieveResult.PlayerStats.Achievements {
+					if ach.Achieved == 1 {
+						completed++
+					}
+				}
+				if total > 0 {
+					achievementPercent = float64(completed) * 100 / float64(total)
+				}
+			}
+		}
+
 		gameData := gameResult[player.GameID].Data
 		var playtime int
 		for _, game := range ownedResult.Response.Games {
@@ -212,21 +243,13 @@ func SteamStatus(c *gin.Context) {
 		}
 
 		c.JSON(http.StatusOK, gin.H{
-			"status": "在游戏中",
-			"game": gin.H{
-				"name":        gameData.Name,
-				"description": gameData.ShortDescription,
-				"image":       gameData.HeaderImage,
-				"price": gin.H{
-					"current":  gameData.PriceOverview.Final / 100,
-					"original": gameData.PriceOverview.Initial / 100,
-					"discount": gameData.PriceOverview.DiscountPercent,
-				},
-				"playtime": gin.H{
-					"hours":   playtime / 60,
-					"minutes": playtime % 60,
-				},
-			},
+			"status":                 "在游戏中",
+			"game":                   player.GameExtraInfo,
+			"game_id":                player.GameID,
+			"description":            gameData.ShortDescription,
+			"price":                  fmt.Sprintf("%.2f", float64(gameData.PriceOverview.Final)/100),
+			"playtime":               fmt.Sprintf("%d小时%d分钟", playtime/60, playtime%60),
+			"achievement_percentage": fmt.Sprintf("%.1f%%", achievementPercent),
 		})
 	} else {
 		status := "离线"
