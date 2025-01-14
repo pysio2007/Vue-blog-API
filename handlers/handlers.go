@@ -242,12 +242,20 @@ func SteamStatus(c *gin.Context) {
 			}
 		}
 
+		// 在 SteamStatus 函数中,修改价格处理逻辑
+		var priceStr string
+		if gameData.PriceOverview.Final == 0 {
+			priceStr = "免费"
+		} else {
+			priceStr = fmt.Sprintf("￥%.2f", float64(gameData.PriceOverview.Final)/100)
+		}
+
 		c.JSON(http.StatusOK, gin.H{
 			"status":                 "在游戏中",
 			"game":                   player.GameExtraInfo,
 			"game_id":                player.GameID,
 			"description":            gameData.ShortDescription,
-			"price":                  fmt.Sprintf("%.2f", float64(gameData.PriceOverview.Final)/100),
+			"price":                  priceStr,
 			"playtime":               fmt.Sprintf("%d小时%d分钟", playtime/60, playtime%60),
 			"achievement_percentage": fmt.Sprintf("%.1f%%", achievementPercent),
 		})
