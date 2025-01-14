@@ -1,15 +1,28 @@
-/tmp
-/out-tsc
+# Binaries
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
 
-/node_modules
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-/.pnp
-.pnp.js
+# Environment
 .env
+
+# Log files
+*.log
 combined.log
 
-.vscode/*
+# IDE files
+.idea/
+.vscode/
 
-src/random_image_count.txt
+# Dependencies
+vendor/
+
+# Temporary files
+tmp/
+temp/
+
+# Build output
+build/
+dist/
