@@ -327,6 +327,9 @@ func GetAPIStats(c *gin.Context) {
 
 func GetAPIStatsByKey(c *gin.Context) {
 	key := c.Param("key")
+	if !strings.HasPrefix(key, "/") {
+		key = "/" + key
+	}
 	var result models.Count
 	err := models.CountsCollection.FindOne(context.Background(), bson.M{"key": key}).Decode(&result)
 	if err != nil {
