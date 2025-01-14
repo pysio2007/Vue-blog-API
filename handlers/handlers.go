@@ -294,6 +294,12 @@ func RandomImage(c *gin.Context) {
 	c.Data(http.StatusOK, "image/webp", result.Data)
 }
 
+type lowerCount struct {
+	Key         string    `json:"key"`
+	Count       int64     `json:"count"`
+	LastUpdated time.Time `json:"lastUpdated"`
+}
+
 func GetAPIStats(c *gin.Context) {
 	stats, err := models.CountsCollection.Find(context.Background(), bson.M{})
 	if err != nil {
@@ -307,7 +313,16 @@ func GetAPIStats(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, results)
+	lowerResults := make([]lowerCount, len(results))
+	for i, r := range results {
+		lowerResults[i] = lowerCount{
+			Key:         r.Key,
+			Count:       r.Count,
+			LastUpdated: r.LastUpdated,
+		}
+	}
+
+	c.JSON(http.StatusOK, lowerResults)
 }
 
 func GetAPIStatsByKey(c *gin.Context) {
@@ -322,7 +337,13 @@ func GetAPIStatsByKey(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	c.JSON(http.StatusOK, result)
+
+	lc := lowerCount{
+		Key:         result.Key,
+		Count:       result.Count,
+		LastUpdated: result.LastUpdated,
+	}
+	c.JSON(http.StatusOK, lc)
 }
 
 func GetImageCount(c *gin.Context) {
