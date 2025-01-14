@@ -55,7 +55,6 @@ func CountAPICall() gin.HandlerFunc {
 			update,
 			opts,
 		)
-
 		if err != nil {
 			// 只记录错误，不中断请求
 			c.Error(err)
