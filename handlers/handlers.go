@@ -334,6 +334,13 @@ func GetImageCount(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"count": count})
 }
 
+type lowerImage struct {
+	Hash        string    `json:"hash"`
+	Data        []byte    `json:"data"`
+	ContentType string    `json:"contentType"`
+	CreatedAt   time.Time `json:"createdAt"`
+}
+
 func GetImageList(c *gin.Context) {
 	page, _ := strconv.ParseInt(c.DefaultQuery("page", "1"), 10, 64)
 	limit, _ := strconv.ParseInt(c.DefaultQuery("limit", "10"), 10, 64)
@@ -363,8 +370,19 @@ func GetImageList(c *gin.Context) {
 		return
 	}
 
+	// 将 images 转为小写 JSON 字段
+	lowerImages := make([]lowerImage, len(images))
+	for i, img := range images {
+		lowerImages[i] = lowerImage{
+			Hash:        img.Hash,
+			Data:        img.Data,
+			ContentType: img.ContentType,
+			CreatedAt:   img.CreatedAt,
+		}
+	}
+
 	c.JSON(http.StatusOK, gin.H{
-		"images": images,
+		"images": lowerImages,
 		"pagination": gin.H{
 			"current": page,
 			"size":    limit,
