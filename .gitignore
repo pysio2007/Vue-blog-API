@@ -26,3 +26,5 @@ temp/
 # Build output
 build/
 dist/
+
+cache/

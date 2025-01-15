@@ -74,6 +74,11 @@ func logEnvironmentStatus() {
 }
 
 func main() {
+	// 初始化缓存目录
+	if err := utils.InitCache(); err != nil {
+		log.Fatalf("Failed to initialize cache: %v", err)
+	}
+
 	// 加载环境变量
 	loadEnv()
 
@@ -114,6 +119,13 @@ func main() {
 	r.GET("/404", handlers.NotFound)
 
 	r.GET("/50x", handlers.ServerError)
+
+	// 添加新的路由
+	adminGroup := r.Group("/admin")
+	adminGroup.Use(middleware.VerifyAdminToken())
+	{
+		adminGroup.POST("/refcache", handlers.RefreshCache)
+	}
 
 	// 启动服务器
 	r.Run(":5000")

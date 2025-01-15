@@ -314,15 +314,46 @@ func RandomImage(c *gin.Context) {
 	}
 
 	var result models.Image
-	err = models.ImagesCollection.FindOne(context.Background(), bson.M{}, options.FindOne().SetSkip(int64(time.Now().UnixNano()%count))).Decode(&result)
+	err = models.ImagesCollection.FindOne(
+		context.Background(),
+		bson.M{},
+		options.FindOne().SetProjection(bson.M{"hash": 1}).SetSkip(int64(time.Now().UnixNano()%count)),
+	).Decode(&result)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
+	var imageData []byte
+	// 检查本地缓存
+	if utils.ImageExistsInCache(result.Hash) {
+		imageData, err = utils.LoadImageFromCache(result.Hash)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load image from cache"})
+			return
+		}
+	} else {
+		// 从数据库获取完整图片数据
+		err = models.ImagesCollection.FindOne(
+			context.Background(),
+			bson.M{"hash": result.Hash},
+		).Decode(&result)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		imageData = result.Data
+
+		// 保存到本地缓存
+		if err := utils.SaveImageToCache(result.Hash, result.Data); err != nil {
+			// 仅记录错误，不影响返回
+			c.Error(err)
+		}
+	}
+
 	c.Header("Content-Type", "image/webp")
 	c.Header("Content-Disposition", fmt.Sprintf(`inline; filename="%s.webp"`, result.Hash))
-	c.Data(http.StatusOK, "image/webp", result.Data)
+	c.Data(http.StatusOK, "image/webp", imageData)
 }
 
 type lowerCount struct {
@@ -529,6 +560,19 @@ func DeleteImage(c *gin.Context) {
 
 func GetImage(c *gin.Context) {
 	hash := c.Param("hash")
+
+	// 先检查缓存
+	if utils.ImageExistsInCache(hash) {
+		imageData, err := utils.LoadImageFromCache(hash)
+		if err == nil {
+			c.Header("Content-Type", "image/webp")
+			c.Header("Content-Disposition", fmt.Sprintf(`inline; filename="%s.webp"`, hash))
+			c.Data(http.StatusOK, "image/webp", imageData)
+			return
+		}
+	}
+
+	// 缓存不存在或读取失败，从数据库获取
 	var image models.Image
 	err := models.ImagesCollection.FindOne(context.Background(), bson.M{"hash": hash}).Decode(&image)
 	if err != nil {
@@ -540,6 +584,11 @@ func GetImage(c *gin.Context) {
 		return
 	}
 
+	// 保存到缓存
+	if err := utils.SaveImageToCache(image.Hash, image.Data); err != nil {
+		c.Error(err)
+	}
+
 	c.Header("Content-Type", image.ContentType)
 	c.Header("Content-Disposition", fmt.Sprintf(`inline; filename="%s.webp"`, image.Hash))
 	c.Data(http.StatusOK, image.ContentType, image.Data)
@@ -547,6 +596,29 @@ func GetImage(c *gin.Context) {
 
 func GetImageByHash(c *gin.Context) {
 	hash := c.Param("hash")
+
+	// 先检查缓存
+	if utils.ImageExistsInCache(hash) {
+		imageData, err := utils.LoadImageFromCache(hash)
+		if err == nil {
+			c.Header("Content-Type", "image/webp")
+			c.Header("Content-Disposition", fmt.Sprintf(`inline; filename="%s.webp"`, hash))
+			c.Header("Cache-Control", "public, max-age=31536000, immutable")
+			c.Header("ETag", fmt.Sprintf(`"%s"`, hash))
+			c.Header("CDN-Cache-Control", "max-age=31536000")
+			c.Header("Surrogate-Control", "max-age=31536000")
+
+			if c.GetHeader("If-None-Match") == fmt.Sprintf(`"%s"`, hash) {
+				c.Status(http.StatusNotModified)
+				return
+			}
+
+			c.Data(http.StatusOK, "image/webp", imageData)
+			return
+		}
+	}
+
+	// 缓存不存在或读取失败，从数据库获取
 	var image models.Image
 	err := models.ImagesCollection.FindOne(context.Background(), bson.M{"hash": hash}).Decode(&image)
 	if err != nil {
@@ -556,6 +628,11 @@ func GetImageByHash(c *gin.Context) {
 		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
+	}
+
+	// 保存到缓存
+	if err := utils.SaveImageToCache(image.Hash, image.Data); err != nil {
+		c.Error(err)
 	}
 
 	c.Header("Content-Type", image.ContentType)
@@ -571,6 +648,51 @@ func GetImageByHash(c *gin.Context) {
 	}
 
 	c.Data(http.StatusOK, image.ContentType, image.Data)
+}
+
+// 新增刷新缓存的处理函数
+func RefreshCache(c *gin.Context) {
+	cursor, err := models.ImagesCollection.Find(context.Background(), bson.M{})
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to query images"})
+		return
+	}
+	defer cursor.Close(context.Background())
+
+	var stats struct {
+		Total   int `json:"total"`
+		Cached  int `json:"cached"`
+		Failed  int `json:"failed"`
+		Skipped int `json:"skipped"`
+	}
+
+	for cursor.Next(context.Background()) {
+		var image models.Image
+		if err := cursor.Decode(&image); err != nil {
+			stats.Failed++
+			continue
+		}
+
+		stats.Total++
+
+		// 如果已经在缓存中，跳过
+		if utils.ImageExistsInCache(image.Hash) {
+			stats.Skipped++
+			continue
+		}
+
+		// 保存到缓存
+		if err := utils.SaveImageToCache(image.Hash, image.Data); err != nil {
+			stats.Failed++
+		} else {
+			stats.Cached++
+		}
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "Cache refresh completed",
+		"stats":   stats,
+	})
 }
 
 func Egg(c *gin.Context) {
