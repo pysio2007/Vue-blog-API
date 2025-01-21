@@ -22,8 +22,12 @@ import (
 )
 
 var (
-	lastHeartbeat int64
-	IPINFO_TOKEN  = os.Getenv("IPINFO_TOKEN")
+	lastHeartbeat     int64
+	IPINFO_TOKEN      = os.Getenv("IPINFO_TOKEN")
+	application       string
+	introduce         string
+	rgba              string
+	applicationOnline bool
 )
 
 func Home(c *gin.Context) {
@@ -66,21 +70,45 @@ func Heartbeat(c *gin.Context) {
 		return
 	}
 
+	application = c.PostForm("application")
+	introduce = c.PostForm("introduce")
+	rgba = c.PostForm("rgba")
+	applicationOnlineStr := c.PostForm("applicationOnline")
+	applicationOnline = applicationOnlineStr == "true"
+
 	lastHeartbeat = time.Now().Unix()
-	c.JSON(http.StatusOK, gin.H{"message": "Heartbeat received"})
+	c.JSON(http.StatusOK, gin.H{
+		"message":           "Heartbeat received",
+		"application":       application,
+		"introduce":         introduce,
+		"rgba":              rgba,
+		"applicationOnline": applicationOnline,
+	})
 }
 
 func Check(c *gin.Context) {
 	if lastHeartbeat != 0 {
 		timeDiff := time.Now().Unix() - lastHeartbeat
-		c.JSON(http.StatusOK, gin.H{
+		response := gin.H{
 			"alive":          timeDiff <= 600,
 			"last_heartbeat": lastHeartbeat,
-		})
+		}
+
+		if applicationOnline {
+			response["application"] = application
+			response["introduce"] = introduce
+			response["rgba"] = rgba
+			response["applicationOnline"] = true
+		} else {
+			response["applicationOnline"] = false
+		}
+
+		c.JSON(http.StatusOK, response)
 	} else {
 		c.JSON(http.StatusOK, gin.H{
-			"alive":          false,
-			"last_heartbeat": nil,
+			"alive":             false,
+			"last_heartbeat":    nil,
+			"applicationOnline": false,
 		})
 	}
 }

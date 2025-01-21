@@ -55,6 +55,53 @@ docker run -p 5000:5000 blog-api
 - `GET /` - 主页
 - `GET /fastfetch` - 获取系统信息
 - `POST /heartbeat` - 心跳检测
+  ```bash
+  # 请求示例
+  curl -X POST http://api.example.com/heartbeat \
+    -H "Authorization: Bearer YOUR_TOKEN" \
+    -d "application=MyApp" \
+    -d "introduce=My Application Description" \
+    -d "rgba=233,30,99,0.17" \
+    -d "applicationOnline=true"
+
+  # 响应示例
+  {
+    "message": "Heartbeat received",
+    "application": "MyApp",
+    "introduce": "My Application Description",
+    "rgba": "233,30,99,0.17",
+    "applicationOnline": true
+  }
+  ```
+- `GET /check` - 检查服务状态
+  ```bash
+  # 请求示例
+  curl http://api.example.com/check
+
+  # 响应示例（当应用在线时）
+  {
+    "alive": true,
+    "last_heartbeat": 1698314159,
+    "application": "MyApp",
+    "introduce": "My Application Description",
+    "rgba": "233,30,99,0.17",
+    "applicationOnline": true
+  }
+
+  # 响应示例（当应用离线时）
+  {
+    "alive": true,
+    "last_heartbeat": 1698314159,
+    "applicationOnline": false
+  }
+
+  # 响应示例（从未收到心跳时）
+  {
+    "alive": false,
+    "last_heartbeat": null,
+    "applicationOnline": false
+  }
+  ```
 - `GET /check` - 检查服务状态
 
 ### 图片相关
