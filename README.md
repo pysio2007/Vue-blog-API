@@ -122,3 +122,15 @@ docker run -p 5000:5000 blog-api
 ## 许可证
 
 AGPLv3 License
+
+## 环境变量
+
+除了现有的环境变量外，还需要配置以下变量来启用 Minio S3 存储：
+
+- `USE_MINIO_STORAGE`: 设置为 "true" 启用 Minio 存储
+- `MINIO_ENDPOINT`: Minio 服务器地址（例如：minio.example.com:9000）
+- `MINIO_ACCESS_KEY`: Minio Access Key
+- `MINIO_SECRET_KEY`: Minio Secret Key
+- `MINIO_BUCKET`: Minio 存储桶名称
+- `MINIO_REGION`: Minio 区域设置
+- `MINIO_USE_SSL`: 是否使用 SSL 连接（true/false）

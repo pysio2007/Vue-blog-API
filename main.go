@@ -74,17 +74,17 @@ func logEnvironmentStatus() {
 }
 
 func main() {
-	// 初始化缓存目录
-	if err := utils.InitCache(); err != nil {
-		log.Fatalf("Failed to initialize cache: %v", err)
-	}
-
-	// 加载环境变量
+	// 加载环境变量 - 移到最前面
 	loadEnv()
 
 	// 检查必需的环境变量
 	if err := utils.CheckRequiredEnvVars(); err != nil {
 		log.Printf("Environment variables warning: %v", err)
+	}
+
+	// 初始化缓存目录
+	if err := utils.InitCache(); err != nil {
+		log.Fatalf("Failed to initialize cache: %v", err)
 	}
 
 	// 初始化数据库连接
@@ -106,7 +106,7 @@ func main() {
 	r.GET("/check", handlers.Check)
 	r.GET("/steam_status", handlers.SteamStatus)
 	r.GET("/ipcheck", handlers.IPCheck)
-	r.GET("/random_image", handlers.RandomImage)
+	r.GET("/random_image", handlers.GetRandomImage)
 	r.GET("/api_stats", handlers.GetAPIStats)
 	r.GET("/api_stats/:key", handlers.GetAPIStatsByKey)
 	r.GET("/images/count", handlers.GetImageCount)

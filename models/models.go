@@ -10,11 +10,18 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
+var (
+	DB               *mongo.Database
+	ImagesCollection *mongo.Collection
+	CountsCollection *mongo.Collection
+)
+
 type Image struct {
 	Hash        string    `bson:"hash"`
-	Data        []byte    `bson:"data"`
+	Data        []byte    `bson:"data,omitempty"`
 	ContentType string    `bson:"contentType"`
 	CreatedAt   time.Time `bson:"createdAt"`
+	UseS3       bool      `bson:"useS3"`
 }
 
 type Count struct {
@@ -22,12 +29,6 @@ type Count struct {
 	Count       int64     `bson:"count"`
 	LastUpdated time.Time `bson:"lastUpdated"`
 }
-
-var (
-	DB               *mongo.Database
-	ImagesCollection *mongo.Collection
-	CountsCollection *mongo.Collection
-)
 
 func InitDB() error {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)

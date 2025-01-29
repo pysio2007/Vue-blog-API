@@ -1,11 +1,15 @@
 package handlers
 
 import (
+	"bytes"
 	"context"
 	"crypto/md5"
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
+	"math/rand"
 	"net/http"
 	"os"
 	"os/exec"
@@ -14,6 +18,8 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/minio/minio-go/v7"
+	"github.com/minio/minio-go/v7/pkg/credentials"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -28,7 +34,73 @@ var (
 	introduce         string
 	rgba              string
 	applicationOnline bool
+	minioClient       *minio.Client
+	useMinioStorage   = os.Getenv("USE_MINIO_STORAGE") == "true"
+	minioBucket       = os.Getenv("MINIO_BUCKET")
 )
+
+func init() {
+	var err error
+	// 检查是否启用了 Minio 存储
+	if useMinioStorage {
+		// 获取所有必需的环境变量
+		endpoint := os.Getenv("MINIO_ENDPOINT")
+		accessKey := os.Getenv("MINIO_ACCESS_KEY")
+		secretKey := os.Getenv("MINIO_SECRET_KEY")
+		bucket := os.Getenv("MINIO_BUCKET")
+
+		// 验证必需的环境变量
+		if endpoint == "" || accessKey == "" || secretKey == "" || bucket == "" {
+			log.Printf("Warning: Missing required Minio environment variables")
+			log.Printf("MINIO_ENDPOINT: %v", endpoint != "")
+			log.Printf("MINIO_ACCESS_KEY: %v", accessKey != "")
+			log.Printf("MINIO_SECRET_KEY: %v", secretKey != "")
+			log.Printf("MINIO_BUCKET: %v", bucket != "")
+			return
+		}
+
+		// 初始化 Minio 客户端
+		minioClient, err = minio.New(endpoint, &minio.Options{
+			Creds:  credentials.NewStaticV4(accessKey, secretKey, ""),
+			Secure: os.Getenv("MINIO_USE_SSL") == "true",
+			Region: os.Getenv("MINIO_REGION"),
+			Transport: &http.Transport{
+				TLSClientConfig: &tls.Config{
+					InsecureSkipVerify: true,
+				},
+				MaxIdleConns:       100,
+				IdleConnTimeout:    90 * time.Second,
+				DisableCompression: true,
+			},
+		})
+		if err != nil {
+			log.Printf("Warning: Failed to initialize Minio client: %v", err)
+			return
+		}
+
+		// 测试连接
+		ctx := context.Background()
+		exists, err := minioClient.BucketExists(ctx, bucket)
+		if err != nil {
+			log.Printf("Warning: Failed to check bucket existence: %v", err)
+			return
+		}
+
+		if !exists {
+			err = minioClient.MakeBucket(ctx, bucket, minio.MakeBucketOptions{
+				Region: os.Getenv("MINIO_REGION"),
+			})
+			if err != nil {
+				log.Printf("Warning: Failed to create bucket: %v", err)
+				return
+			}
+		}
+
+		log.Printf("Successfully initialized Minio client with endpoint: %s", endpoint)
+	} else {
+		log.Printf("Minio storage is disabled")
+	}
+}
 
 func Home(c *gin.Context) {
 	c.String(http.StatusOK, "你来这里干啥 喵?")
@@ -329,59 +401,40 @@ func IPCheck(c *gin.Context) {
 	c.JSON(http.StatusOK, result)
 }
 
-func RandomImage(c *gin.Context) {
-	count, err := models.ImagesCollection.CountDocuments(context.Background(), bson.M{})
+func GetRandomImage(c *gin.Context) {
+	// 只查询 Minio 存储的图片
+	filter := bson.M{"useS3": true}
+
+	// 获取总文档数
+	total, err := models.ImagesCollection.CountDocuments(context.Background(), filter)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Failed to get total count: %v", err)})
 		return
 	}
 
-	if count == 0 {
+	if total == 0 {
 		c.JSON(http.StatusNotFound, gin.H{"error": "No images available"})
 		return
 	}
 
-	var result models.Image
+	// 随机选择一个偏移量
+	skip := rand.Int63n(total)
+
+	// 查找图片
+	var image models.Image
 	err = models.ImagesCollection.FindOne(
 		context.Background(),
-		bson.M{},
-		options.FindOne().SetProjection(bson.M{"hash": 1}).SetSkip(int64(time.Now().UnixNano()%count)),
-	).Decode(&result)
+		filter,
+		options.FindOne().SetSkip(skip),
+	).Decode(&image)
+
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Failed to get random image: %v", err)})
 		return
 	}
 
-	var imageData []byte
-	// 检查本地缓存
-	if utils.ImageExistsInCache(result.Hash) {
-		imageData, err = utils.LoadImageFromCache(result.Hash)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load image from cache"})
-			return
-		}
-	} else {
-		// 从数据库获取完整图片数据
-		err = models.ImagesCollection.FindOne(
-			context.Background(),
-			bson.M{"hash": result.Hash},
-		).Decode(&result)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-			return
-		}
-		imageData = result.Data
-
-		// 保存到本地缓存
-		if err := utils.SaveImageToCache(result.Hash, result.Data); err != nil {
-			// 仅记录错误，不影响返回
-			c.Error(err)
-		}
-	}
-
-	c.Header("Content-Type", "image/webp")
-	c.Header("Content-Disposition", fmt.Sprintf(`inline; filename="%s.webp"`, result.Hash))
-	c.Data(http.StatusOK, "image/webp", imageData)
+	// 查到随机图片后，改为重定向:
+	c.Redirect(http.StatusFound, fmt.Sprintf("https://minioapi.pysio.online/randomimg/%s.webp", image.Hash))
 }
 
 type lowerCount struct {
@@ -552,16 +605,31 @@ func AddImage(c *gin.Context) {
 		return
 	}
 
-	// 保存图片
+	// 在保存到数据库之前，如果启用了 Minio，先保存到 Minio
+	if useMinioStorage {
+		if err := saveImageToMinio(hash, webpBuffer); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Failed to save image to Minio: %v", err)})
+			return
+		}
+		// 如果使用 Minio，数据库中就不存储图片数据了
+		webpBuffer = nil
+	}
+
+	// 保存图片信息到数据库
 	image := models.Image{
 		Hash:        hash,
-		Data:        webpBuffer,
+		Data:        webpBuffer, // 如果使用 Minio，这里是 nil
 		ContentType: "image/webp",
 		CreatedAt:   time.Now(),
+		UseS3:       useMinioStorage,
 	}
 
 	_, err = models.ImagesCollection.InsertOne(context.Background(), image)
 	if err != nil {
+		if useMinioStorage {
+			// 如果数据库保存失败，需要从 Minio 中删除已上传的图片
+			_ = deleteImageFromMinio(hash)
+		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
@@ -574,6 +642,28 @@ func AddImage(c *gin.Context) {
 
 func DeleteImage(c *gin.Context) {
 	hash := c.Param("hash")
+
+	// 先获取图片信息
+	var image models.Image
+	err := models.ImagesCollection.FindOne(context.Background(), bson.M{"hash": hash}).Decode(&image)
+	if err != nil {
+		if err == mongo.ErrNoDocuments {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Image not found"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	// 如果使用 Minio，先删除 Minio 中的图片
+	if image.UseS3 {
+		if err := deleteImageFromMinio(hash); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Failed to delete image from Minio: %v", err)})
+			return
+		}
+	}
+
+	// 删除数据库记录
 	result, err := models.ImagesCollection.DeleteOne(context.Background(), bson.M{"hash": hash})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -583,99 +673,25 @@ func DeleteImage(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Image not found"})
 		return
 	}
+
+	// 删除缓存
+	utils.DeleteImageFromCache(hash)
+
 	c.JSON(http.StatusOK, gin.H{"message": "Image deleted successfully"})
 }
 
 func GetImage(c *gin.Context) {
 	hash := c.Param("hash")
 
-	// 先检查缓存
-	if utils.ImageExistsInCache(hash) {
-		imageData, err := utils.LoadImageFromCache(hash)
-		if err == nil {
-			c.Header("Content-Type", "image/webp")
-			c.Header("Content-Disposition", fmt.Sprintf(`inline; filename="%s.webp"`, hash))
-			c.Data(http.StatusOK, "image/webp", imageData)
-			return
-		}
-	}
-
-	// 缓存不存在或读取失败，从数据库获取
-	var image models.Image
-	err := models.ImagesCollection.FindOne(context.Background(), bson.M{"hash": hash}).Decode(&image)
-	if err != nil {
-		if err == mongo.ErrNoDocuments {
-			c.JSON(http.StatusNotFound, gin.H{"error": "Image not found"})
-			return
-		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-
-	// 保存到缓存
-	if err := utils.SaveImageToCache(image.Hash, image.Data); err != nil {
-		c.Error(err)
-	}
-
-	c.Header("Content-Type", image.ContentType)
-	c.Header("Content-Disposition", fmt.Sprintf(`inline; filename="%s.webp"`, image.Hash))
-	c.Data(http.StatusOK, image.ContentType, image.Data)
+	// 改为重定向:
+	c.Redirect(http.StatusFound, fmt.Sprintf("https://minioapi.pysio.online/randomimg/%s.webp", hash))
 }
 
 func GetImageByHash(c *gin.Context) {
 	hash := c.Param("hash")
 
-	// 先检查缓存
-	if utils.ImageExistsInCache(hash) {
-		imageData, err := utils.LoadImageFromCache(hash)
-		if err == nil {
-			c.Header("Content-Type", "image/webp")
-			c.Header("Content-Disposition", fmt.Sprintf(`inline; filename="%s.webp"`, hash))
-			c.Header("Cache-Control", "public, max-age=31536000, immutable")
-			c.Header("ETag", fmt.Sprintf(`"%s"`, hash))
-			c.Header("CDN-Cache-Control", "max-age=31536000")
-			c.Header("Surrogate-Control", "max-age=31536000")
-
-			if c.GetHeader("If-None-Match") == fmt.Sprintf(`"%s"`, hash) {
-				c.Status(http.StatusNotModified)
-				return
-			}
-
-			c.Data(http.StatusOK, "image/webp", imageData)
-			return
-		}
-	}
-
-	// 缓存不存在或读取失败，从数据库获取
-	var image models.Image
-	err := models.ImagesCollection.FindOne(context.Background(), bson.M{"hash": hash}).Decode(&image)
-	if err != nil {
-		if err == mongo.ErrNoDocuments {
-			c.JSON(http.StatusNotFound, gin.H{"error": "Image not found"})
-			return
-		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-
-	// 保存到缓存
-	if err := utils.SaveImageToCache(image.Hash, image.Data); err != nil {
-		c.Error(err)
-	}
-
-	c.Header("Content-Type", image.ContentType)
-	c.Header("Content-Disposition", fmt.Sprintf(`inline; filename="%s.webp"`, image.Hash))
-	c.Header("Cache-Control", "public, max-age=31536000, immutable")
-	c.Header("ETag", fmt.Sprintf(`"%s"`, image.Hash))
-	c.Header("CDN-Cache-Control", "max-age=31536000")
-	c.Header("Surrogate-Control", "max-age=31536000")
-
-	if c.GetHeader("If-None-Match") == fmt.Sprintf(`"%s"`, image.Hash) {
-		c.Status(http.StatusNotModified)
-		return
-	}
-
-	c.Data(http.StatusOK, image.ContentType, image.Data)
+	// 改为重定向:
+	c.Redirect(http.StatusFound, fmt.Sprintf("https://minioapi.pysio.online/randomimg/%s.webp", hash))
 }
 
 // 新增刷新缓存的处理函数
@@ -750,4 +766,22 @@ func parseAnsiColors(text string) string {
 		result = strings.ReplaceAll(result, fmt.Sprintf("\x1b[%sm", code), fmt.Sprintf(`<span style="color:%s">`, color))
 	}
 	return result
+}
+
+func saveImageToMinio(hash string, data []byte) error {
+	if !useMinioStorage {
+		return nil
+	}
+	reader := bytes.NewReader(data)
+	_, err := minioClient.PutObject(context.Background(), minioBucket, hash+".webp", reader, int64(len(data)), minio.PutObjectOptions{
+		ContentType: "image/webp",
+	})
+	return err
+}
+
+func deleteImageFromMinio(hash string) error {
+	if !useMinioStorage {
+		return nil
+	}
+	return minioClient.RemoveObject(context.Background(), minioBucket, hash+".webp", minio.RemoveObjectOptions{})
 }
