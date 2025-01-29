@@ -3,14 +3,13 @@ package main
 import (
 	"bytes"
 	"context"
+	"crypto/tls"
 	"fmt"
 	"log"
 	"net/http"
 	"os"
 	"sync"
 	"time"
-
-	"crypto/tls"
 
 	"github.com/joho/godotenv"
 	"github.com/minio/minio-go/v7"
