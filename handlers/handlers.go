@@ -427,7 +427,6 @@ func GetRandomImage(c *gin.Context) {
 		filter,
 		options.FindOne().SetSkip(skip),
 	).Decode(&image)
-
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Failed to get random image: %v", err)})
 		return
