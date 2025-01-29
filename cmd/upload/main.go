@@ -31,7 +31,7 @@ func init() {
 
 	// 命令行参数
 	flag.StringVar(&folderPath, "folder", "", "图片文件夹路径")
-	flag.StringVar(&apiEndpoint, "api", "http://127.0.0.1:5000", "API 端点")
+	flag.StringVar(&apiEndpoint, "api", "https://blogapi.pysio.online", "API 端点")
 	flag.StringVar(&adminToken, "token", os.Getenv("ADMIN_TOKEN"), "管理员令牌")
 	flag.IntVar(&concurrent, "concurrent", 5, "并发上传数量")
 	flag.Parse()
