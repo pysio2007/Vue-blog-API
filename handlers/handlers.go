@@ -433,7 +433,7 @@ func GetRandomImage(c *gin.Context) {
 	}
 
 	// 查到随机图片后，改为重定向:
-	c.Redirect(http.StatusFound, fmt.Sprintf("https://minioapi.pysio.online/randomimg/%s.webp", image.Hash))
+	c.Redirect(http.StatusTemporaryRedirect, fmt.Sprintf("https://minioapi.pysio.online/randomimg/%s.webp", image.Hash))
 }
 
 type lowerCount struct {
