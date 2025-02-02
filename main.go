@@ -117,8 +117,12 @@ func main() {
 	r.GET("/i/:hash", handlers.GetImageByHash)
 	r.GET("/egg", handlers.Egg)
 	r.GET("/404", handlers.NotFound)
-
 	r.GET("/50x", handlers.ServerError)
+
+	// 新增 Cloudflare 统计接口
+	r.GET("/cloudflare_stats", middleware.CloudflareStats)
+	// r.GET("/listdomain", middleware.ListDomains)
+	// r.GET("/domain/*domain", middleware.GetDomainDetails)
 
 	// 添加新的路由
 	adminGroup := r.Group("/admin")

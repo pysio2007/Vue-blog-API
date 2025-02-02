@@ -134,3 +134,6 @@ AGPLv3 License
 - `MINIO_BUCKET`: Minio 存储桶名称
 - `MINIO_REGION`: Minio 区域设置
 - `MINIO_USE_SSL`: 是否使用 SSL 连接（true/false）
+
+- `CLOUDFLARE_API_TOKEN`: Cloudflare API 鉴权 Token
+- `CLOUDFLARE_ACCOUNT_ID`: Cloudflare 账户 ID
