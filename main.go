@@ -99,6 +99,14 @@ func main() {
 	r.Use(middleware.CORS())
 	r.Use(middleware.CountAPICall())
 
+	// 注册 git 代理路由
+	gitGroup := r.Group("/")
+	gitGroup.Use(middleware.GitProxyMiddleware())
+	{
+		gitGroup.Any("/github/*any", func(c *gin.Context) {})
+		gitGroup.Any("/gitlab/*any", func(c *gin.Context) {})
+	}
+
 	// 配置路由
 	r.GET("/", handlers.Home)
 	r.GET("/fastfetch", handlers.Fastfetch)

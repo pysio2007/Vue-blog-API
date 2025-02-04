@@ -119,6 +119,17 @@ docker run -p 5000:5000 blog-api
 - `GET /api_stats` - 获取 API 调用统计
 - `GET /api_stats/:key` - 获取特定接口调用次数
 
+### Git 仓库代理
+- 支持通过 API 服务器代理访问 GitHub 和 GitLab 仓库
+- 格式：
+  ```bash
+  # GitHub 仓库
+  git clone http://api.example.com/github/https://github.com/username/repo.git
+
+  # GitLab 仓库
+  git clone http://api.example.com/gitlab/https://gitlab.com/username/repo.git
+  ```
+
 ## 许可证
 
 AGPLv3 License
@@ -137,3 +148,7 @@ AGPLv3 License
 
 - `CLOUDFLARE_API_TOKEN`: Cloudflare API 鉴权 Token
 - `CLOUDFLARE_ACCOUNT_ID`: Cloudflare 账户 ID
+
+- `GITHUB_TOKEN`: GitHub 个人访问令牌，用于 Git 代理功能
+  - 创建地址：https://github.com/settings/tokens
+  - 需要的权限：repo (private repo access)
