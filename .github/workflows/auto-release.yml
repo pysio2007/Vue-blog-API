@@ -83,4 +83,4 @@ jobs:
           gh release create ${COMMIT_HASH} \
             --title "Release ${COMMIT_HASH}" \
             --notes "${COMMIT_MSG}" \
-            *.tar.gz
+            artifacts/**/*.tar.gz
