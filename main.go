@@ -1,12 +1,14 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"os"
 	"path/filepath"
 
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
+	"github.com/spf13/viper"
 	"pysio.online/blog_api/handlers"
 	"pysio.online/blog_api/middleware"
 	"pysio.online/blog_api/models"
@@ -73,6 +75,17 @@ func logEnvironmentStatus() {
 	}
 }
 
+func init() {
+	// 设置配置文件
+	viper.SetConfigName("github_config")
+	viper.SetConfigType("yaml")
+	viper.AddConfigPath("./config")
+
+	if err := viper.ReadInConfig(); err != nil {
+		panic(fmt.Errorf("fatal error config file: %w", err))
+	}
+}
+
 func main() {
 	// 加载环境变量 - 移到最前面
 	loadEnv()
@@ -98,6 +111,7 @@ func main() {
 	// 配置中间件
 	r.Use(middleware.CORS())
 	r.Use(middleware.CountAPICall())
+	r.Use(middleware.GithubAPIProxyMiddleware())
 
 	// 注册 git 代理路由
 	gitGroup := r.Group("/")
