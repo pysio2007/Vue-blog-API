@@ -738,6 +738,26 @@ func RefreshCache(c *gin.Context) {
 	})
 }
 
+func CheckSVG(c *gin.Context) {
+	alive := false
+	if lastHeartbeat != 0 {
+		timeDiff := time.Now().Unix() - lastHeartbeat
+		alive = timeDiff <= 600
+	}
+
+	// Base64 编码的脉冲动画图标
+	pulseIcon := "PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxNiIgaGVpZ2h0PSIxNiIgdmlld0JveD0iMCAwIDE2IDE2Ij48Y2lyY2xlIGN4PSI4IiBjeT0iOCIgcj0iNCIgZmlsbD0iIzQ0YzQ3MCIgc3R5bGU9ImFuaW1hdGlvbjogcHVsc2UgMnMgaW5maW5pdGUiPjwvY2lyY2xlPjxzdHlsZT5Aa2V5ZnJhbWVzIHB1bHNlIHswJSB7b3BhY2l0eTogMX01MCUge29wYWNpdHk6IDAuNX0xMDAlIHtvcGFjaXR5OiAxfX08L3N0eWxlPjwvc3ZnPg=="
+
+	var redirectURL string
+	if alive {
+		redirectURL = fmt.Sprintf("https://img.shields.io/badge/Status-Alive-brightgreen?style=for-the-badge&logo=data:image/svg+xml;base64,%s", pulseIcon)
+	} else {
+		redirectURL = fmt.Sprintf("https://img.shields.io/badge/Status-Sleep-9f7be1?style=for-the-badge&logo=data:image/svg+xml;base64,%s", pulseIcon)
+	}
+
+	c.Redirect(http.StatusMovedPermanently, redirectURL)
+}
+
 func Egg(c *gin.Context) {
 	c.String(http.StatusOK, "Oops!")
 }

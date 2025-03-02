@@ -126,6 +126,7 @@ func main() {
 	r.GET("/fastfetch", handlers.Fastfetch)
 	r.POST("/heartbeat", handlers.Heartbeat)
 	r.GET("/check", handlers.Check)
+	r.GET("/check/svg", handlers.CheckSVG)
 	r.GET("/steam_status", handlers.SteamStatus)
 	r.GET("/ipcheck", handlers.IPCheck)
 	r.GET("/random_image", handlers.GetRandomImage)
