@@ -1,0 +1,1049 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "Go Blog API",
+    "description": "基于 Go 语言的博客 API 服务，提供图片存储、Steam 状态查询、系统信息获取等功能",
+    "version": "1.0.0",
+    "license": {
+      "name": "AGPLv3",
+      "url": "https://www.gnu.org/licenses/agpl-3.0.html"
+    }
+  },
+  "servers": [
+    {
+      "url": "https://blogapi.pysio.online",
+      "description": "生产环境服务器"
+    },
+    {
+      "url": "http://localhost:5000",
+      "description": "本地开发服务器"
+    }
+  ],
+  "paths": {
+    "/": {
+      "get": {
+        "summary": "主页",
+        "description": "返回API服务的主页信息",
+        "responses": {
+          "200": {
+            "description": "成功返回主页信息",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string",
+                  "example": "你来这里干啥 喵?"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/fastfetch": {
+      "get": {
+        "summary": "获取系统信息",
+        "description": "使用fastfetch获取服务器系统信息，包含ANSI颜色代码",
+        "responses": {
+          "200": {
+            "description": "成功返回系统信息",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "example": "success"
+                    },
+                    "output": {
+                      "type": "string",
+                      "description": "带ANSI颜色代码的系统信息输出"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "服务器错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "example": "error"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/heartbeat": {
+      "post": {
+        "summary": "心跳检测",
+        "description": "发送应用心跳信息，用于监控应用状态。需要Bearer Token认证。",
+        "security": [
+          {
+            "appAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "application": {
+                    "type": "string",
+                    "description": "应用名称"
+                  },
+                  "introduce": {
+                    "type": "string",
+                    "description": "应用描述"
+                  },
+                  "rgba": {
+                    "type": "string",
+                    "description": "RGBA 颜色值，格式如：233,30,99,0.17"
+                  },
+                  "applicationOnline": {
+                    "type": "boolean",
+                    "description": "应用是否在线"
+                  }
+                },
+                "required": ["application"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "心跳信息接收成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "example": "Heartbeat received"
+                    },
+                    "application": {
+                      "type": "string"
+                    },
+                    "introduce": {
+                      "type": "string"
+                    },
+                    "rgba": {
+                      "type": "string"
+                    },
+                    "applicationOnline": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "认证失败",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "example": "Invalid token"
+                    },
+                    "debug": {
+                      "type": "string",
+                      "description": "调试信息"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "服务器错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "debug": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/check": {
+      "get": {
+        "summary": "检查服务状态",
+        "description": "获取最近一次心跳信息和应用状态",
+        "responses": {
+          "200": {
+            "description": "成功返回服务状态",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "alive": {
+                      "type": "boolean",
+                      "description": "服务是否存活"
+                    },
+                    "last_heartbeat": {
+                      "type": ["number", "null"],
+                      "description": "最后一次心跳时间戳"
+                    },
+                    "application": {
+                      "type": "string",
+                      "description": "应用名称"
+                    },
+                    "introduce": {
+                      "type": "string",
+                      "description": "应用描述"
+                    },
+                    "rgba": {
+                      "type": "string",
+                      "description": "RGBA 颜色值"
+                    },
+                    "applicationOnline": {
+                      "type": "boolean",
+                      "description": "应用是否在线"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/check/svg": {
+      "get": {
+        "summary": "获取服务状态SVG图标",
+        "description": "返回一个显示服务状态的SVG图标",
+        "responses": {
+          "200": {
+            "description": "成功返回SVG图标",
+            "content": {
+              "image/svg+xml": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/random_image": {
+      "get": {
+        "summary": "随机获取图片",
+        "description": "从图片库中随机返回一张图片，将重定向到Minio存储的图片URL",
+        "responses": {
+          "307": {
+            "description": "临时重定向到图片URL",
+            "headers": {
+              "Location": {
+                "description": "图片URL，格式为https://minioapi.pysio.online/randomimg/{hash}.webp",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "没有可用的图片",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "example": "No images available"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/images/count": {
+      "get": {
+        "summary": "获取图片总数",
+        "description": "返回图片库中的图片总数",
+        "responses": {
+          "200": {
+            "description": "成功返回图片总数",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "count": {
+                      "type": "integer",
+                      "description": "图片总数"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/images/list": {
+      "get": {
+        "summary": "获取图片列表",
+        "description": "返回图片库中所有图片的列表，支持分页",
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "description": "页码，默认为1",
+            "schema": {
+              "type": "integer",
+              "default": 1
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "每页数量，默认为10",
+            "schema": {
+              "type": "integer",
+              "default": 10
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功返回图片列表",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "images": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "hash": {
+                            "type": "string",
+                            "description": "图片哈希值"
+                          },
+                          "contentType": {
+                            "type": "string",
+                            "description": "图片MIME类型"
+                          },
+                          "createdAt": {
+                            "type": "string",
+                            "format": "date-time",
+                            "description": "图片创建时间"
+                          }
+                        }
+                      }
+                    },
+                    "pagination": {
+                      "type": "object",
+                      "properties": {
+                        "current": {
+                          "type": "integer",
+                          "description": "当前页码"
+                        },
+                        "size": {
+                          "type": "integer",
+                          "description": "每页数量"
+                        },
+                        "total": {
+                          "type": "integer",
+                          "description": "总数量"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/images/add": {
+      "post": {
+        "summary": "添加新图片",
+        "description": "上传新图片到图片库",
+        "security": [
+          {
+            "adminAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "image": {
+                    "type": "string",
+                    "format": "binary",
+                    "description": "要上传的图片文件"
+                  }
+                },
+                "required": ["image"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "图片上传成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "hash": {
+                      "type": "string",
+                      "description": "图片哈希值"
+                    },
+                    "size": {
+                      "type": "integer",
+                      "description": "图片大小（字节）"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求参数错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "example": "Image file is required"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未授权"
+          },
+          "409": {
+            "description": "图片已存在",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "example": "Image already exists"
+                    },
+                    "hash": {
+                      "type": "string",
+                      "description": "已存在图片的哈希值"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/images/{hash}": {
+      "get": {
+        "summary": "获取指定图片",
+        "description": "通过哈希值获取特定图片，将重定向到Minio存储的图片URL",
+        "parameters": [
+          {
+            "name": "hash",
+            "in": "path",
+            "required": true,
+            "description": "图片哈希值",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "302": {
+            "description": "重定向到图片URL",
+            "headers": {
+              "Location": {
+                "description": "图片URL，格式为https://minioapi.pysio.online/randomimg/{hash}.webp",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "图片不存在"
+          }
+        }
+      },
+      "delete": {
+        "summary": "删除图片",
+        "description": "通过哈希值删除特定图片",
+        "security": [
+          {
+            "adminAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "hash",
+            "in": "path",
+            "required": true,
+            "description": "图片哈希值",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "图片删除成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "example": "Image deleted successfully"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未授权"
+          },
+          "404": {
+            "description": "图片不存在"
+          }
+        }
+      }
+    },
+    "/i/{hash}": {
+      "get": {
+        "summary": "通过 hash 直接访问图片",
+        "description": "简短URL方式访问图片，将重定向到Minio存储的图片URL",
+        "parameters": [
+          {
+            "name": "hash",
+            "in": "path",
+            "required": true,
+            "description": "图片哈希值",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "302": {
+            "description": "重定向到图片URL",
+            "headers": {
+              "Location": {
+                "description": "图片URL，格式为https://minioapi.pysio.online/randomimg/{hash}.webp",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "图片不存在"
+          }
+        }
+      }
+    },
+    "/steam_status": {
+      "get": {
+        "summary": "获取 Steam 状态",
+        "description": "获取配置的Steam账号的游戏状态，如果正在游戏则返回详细游戏信息",
+        "responses": {
+          "200": {
+            "description": "成功返回 Steam 状态",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "status": {
+                          "type": "string",
+                          "enum": ["在游戏中"],
+                          "description": "用户状态"
+                        },
+                        "game": {
+                          "type": "string",
+                          "description": "正在玩的游戏名称"
+                        },
+                        "game_id": {
+                          "type": "string",
+                          "description": "游戏ID"
+                        },
+                        "description": {
+                          "type": "string",
+                          "description": "游戏简介"
+                        },
+                        "price": {
+                          "type": "string",
+                          "description": "游戏价格，格式：￥xx.xx 或 免费"
+                        },
+                        "playtime": {
+                          "type": "string",
+                          "description": "游戏时长，格式：xx小时xx分钟"
+                        },
+                        "achievement_percentage": {
+                          "type": "string",
+                          "description": "成就完成度，格式：xx.x%"
+                        }
+                      }
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "status": {
+                          "type": "string",
+                          "enum": ["在线", "离线"],
+                          "description": "用户状态"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "服务器错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/ipcheck": {
+      "get": {
+        "summary": "IP 信息查询",
+        "description": "获取指定IP地址的详细信息",
+        "parameters": [
+          {
+            "name": "ip",
+            "in": "query",
+            "required": true,
+            "description": "要查询的IP地址",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功返回 IP 信息",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ip": {
+                      "type": "string",
+                      "description": "IP地址"
+                    },
+                    "city": {
+                      "type": "string",
+                      "description": "城市"
+                    },
+                    "region": {
+                      "type": "string",
+                      "description": "地区"
+                    },
+                    "country": {
+                      "type": "string",
+                      "description": "国家"
+                    },
+                    "loc": {
+                      "type": "string",
+                      "description": "经纬度"
+                    },
+                    "org": {
+                      "type": "string",
+                      "description": "组织"
+                    },
+                    "postal": {
+                      "type": "string",
+                      "description": "邮政编码"
+                    },
+                    "timezone": {
+                      "type": "string",
+                      "description": "时区"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求参数错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "example": "error"
+                    },
+                    "message": {
+                      "type": "string",
+                      "example": "IP 参数是必须的"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api_stats": {
+      "get": {
+        "summary": "获取 API 调用统计",
+        "description": "获取所有API端点的调用次数统计",
+        "responses": {
+          "200": {
+            "description": "成功返回 API 调用统计",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "key": {
+                        "type": "string",
+                        "description": "API路径"
+                      },
+                      "count": {
+                        "type": "integer",
+                        "description": "调用次数"
+                      },
+                      "lastUpdated": {
+                        "type": "string",
+                        "format": "date-time",
+                        "description": "最后更新时间"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api_stats/{key}": {
+      "get": {
+        "summary": "获取特定接口调用次数",
+        "description": "获取指定API端点的调用次数",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "description": "API路径",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功返回特定接口调用次数",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "key": {
+                      "type": "string",
+                      "description": "API路径"
+                    },
+                    "count": {
+                      "type": "integer",
+                      "description": "调用次数"
+                    },
+                    "lastUpdated": {
+                      "type": "string",
+                      "format": "date-time",
+                      "description": "最后更新时间"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "未找到该API路径的统计信息"
+          }
+        }
+      }
+    },
+    "/cloudflare_stats": {
+      "get": {
+        "summary": "获取Cloudflare统计信息",
+        "description": "获取Cloudflare的域名访问统计信息",
+        "responses": {
+          "200": {
+            "description": "成功返回Cloudflare统计信息",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/egg": {
+      "get": {
+        "summary": "彩蛋",
+        "description": "返回一个彩蛋内容",
+        "responses": {
+          "200": {
+            "description": "成功返回彩蛋内容"
+          }
+        }
+      }
+    },
+    "/404": {
+      "get": {
+        "summary": "404页面",
+        "description": "返回404错误页面",
+        "responses": {
+          "404": {
+            "description": "页面未找到"
+          }
+        }
+      }
+    },
+    "/50x": {
+      "get": {
+        "summary": "服务器错误页面",
+        "description": "返回服务器错误页面",
+        "responses": {
+          "500": {
+            "description": "服务器内部错误"
+          }
+        }
+      }
+    },
+    "/admin/refcache": {
+      "post": {
+        "summary": "刷新缓存",
+        "description": "刷新服务器缓存",
+        "security": [
+          {
+            "adminAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "缓存刷新成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "example": "Cache refreshed successfully"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未授权"
+          }
+        }
+      }
+    },
+    "/github/{path}": {
+      "get": {
+        "summary": "GitHub仓库代理",
+        "description": "通过API服务器代理访问GitHub仓库",
+        "parameters": [
+          {
+            "name": "path",
+            "in": "path",
+            "required": true,
+            "description": "GitHub仓库路径",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功代理GitHub请求"
+          }
+        }
+      }
+    },
+    "/gitlab/{path}": {
+      "get": {
+        "summary": "GitLab仓库代理",
+        "description": "通过API服务器代理访问GitLab仓库",
+        "parameters": [
+          {
+            "name": "path",
+            "in": "path",
+            "required": true,
+            "description": "GitLab仓库路径",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功代理GitLab请求"
+          }
+        }
+      }
+    },
+    "/githubapi/{path}": {
+      "get": {
+        "summary": "GitHub API代理",
+        "description": "通过API服务器代理访问GitHub API",
+        "parameters": [
+          {
+            "name": "path",
+            "in": "path",
+            "required": true,
+            "description": "GitHub API路径",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功代理GitHub API请求"
+          },
+          "403": {
+            "description": "API端点不在白名单中"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "adminAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "使用管理员Bearer令牌进行身份验证。在请求头中添加 'Authorization: Bearer {ADMIN_TOKEN}'"
+      },
+      "appAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "使用应用Bearer令牌进行身份验证。在请求头中添加 'Authorization: Bearer {TOKEN}'"
+      }
+    },
+    "schemas": {
+      "Image": {
+        "type": "object",
+        "properties": {
+          "hash": {
+            "type": "string",
+            "description": "图片哈希值"
+          },
+          "contentType": {
+            "type": "string",
+            "description": "图片MIME类型"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "图片创建时间"
+          },
+          "useS3": {
+            "type": "boolean",
+            "description": "是否使用S3存储"
+          }
+        }
+      },
+      "Count": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string",
+            "description": "API路径"
+          },
+          "count": {
+            "type": "integer",
+            "description": "调用次数"
+          },
+          "lastUpdated": {
+            "type": "string",
+            "format": "date-time",
+            "description": "最后更新时间"
+          }
+        }
+      }
+    }
+  }
+} 
